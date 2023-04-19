@@ -13,9 +13,11 @@ from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
+from sqlalchemy.orm import sessionmaker
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:Sr080601@localhost/DATA'
+
 app.config['SECRET_KEY'] = 'thisisasecretkey'
 app.config['JWT_SECRET_KEY'] = 'super-secret'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
@@ -82,79 +84,157 @@ def display():
         Manager = manager.query.filter_by(id = user_id).first()
         return jsonify({"username": Manager.manager_name, "password": Manager.password})
 
-# @app.route('/register', methods=['POST'])
-# def register():
-#     username = request.json.get('username', None)
-#     password = request.json.get('password', None)
-#     role= request.json.get('role', None)
+@app.route('/search', methods=['GET'])
+def search():
+    search_by= request.json.get('search_by')
+    name= request.json.get('name', None)
+    role= request.json.get('role', None)
+    # user_id= request.json.get('userid', None)
+    # user = User.query.get(user_id)
+    if(search_by== 'name'):
+        person= []
+        users = User.query.filter_by(username=name).all()
+        for user in users:
+            person.append({'id': user.id, 'username': user.username, 'password': user.password})
+        admins = admin.query.filter_by(admin_name=name).all()
+        for Admin in admins:
+            person.append({'id': Admin.id, 'admin_name': Admin.admin_name, 'password': Admin.password})
+        managers = manager.query.filter_by(manager_name=name).all()
+        for Manager in managers:
+            person.append({'id': Manager.id, 'manager_name': Manager.manager_name, 'password': Manager.password})
 
-#     if len(username) > 10:
-#         return jsonify({"message": "username too long"}), 400
-
-#     password_regex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$"
-#     if not re.match(password_regex, password):
-#         return jsonify({"message": "Password should be minimum eight characters, at least one uppercase letter, one lowercase letter and one number"}), 400
-
-#     existing_username = (User.query.filter_by(username=username).first() or admin.query.filter_by(admin_name=username).first() or manager.query.filter_by(manager_name=username).first())
-
-#     if existing_username:
-#         return jsonify({"message": "Already exists"}), 400
-
-#     hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
-#     if role== 'admin':
-#         new_user= admin(admin_name= username, password= hashed_password)
-
-#     if role== 'user':
-#         new_user = User(username=username, password=hashed_password)
+        return jsonify(person)
     
-#     if role== 'manager':
-#         new_user = manager(manager_name=username, password=hashed_password)
+    elif search_by == 'role':
+        persons = []
+        if role == 'employee':
+            users = User.query.all()
+            for user in users:
+                persons.append({'id': user.id, 'username': user.username, 'password': user.password})
 
-#     db.session.add(new_user)
-#     db.session.commit()
+        elif role == 'admin':
+            admins = admin.query.all()
+            for Admin in admins:
+                persons.append({'id': Admin.id, 'admin_name': Admin.admin_name, 'password': Admin.password})
 
-#     return jsonify({"message": "register successful"}), 201
+        elif role == 'manager':
+            managers = manager.query.all()
+            for Manager in managers:
+                persons.append({'id': Manager.id, 'manager_name': Manager.manager_name, 'password': Manager.password})
+
+        return jsonify(persons)
+
+        # return jsonify([p.serialize() for p in person])
+
+    return jsonify({'message': 'Invalid search_by parameter'}), 400
+
+
+    #     return jsonify({"id": person[0], "name": person[1], "password": person[2]})
+    # print(user)
+
+
+    # elif search_by == 'role':
+
+
+    # return jsonify({"username": user.username, "password": user.password})
 
 @app.route('/register', methods=['POST'])
-@jwt_required()
 def register():
-    current_user_id = get_jwt_identity()
-    adminx = admin.query.filter_by(id=current_user_id).first()
-    if adminx:
-        username = request.json.get('username', None)
-        password = request.json.get('password', None)
-        role= request.json.get('role', None)
+    username = request.json.get('username', None)
+    password = request.json.get('password', None)
+    role= request.json.get('role', None)
 
-        if len(username) > 10:
-            return jsonify({"message": "username too long"}), 400
+    if len(username) > 10:
+        return jsonify({"message": "username too long"}), 400
 
-        password_regex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$"
-        if not re.match(password_regex, password):
-            return jsonify({"message": "Password should be minimum eight characters, at least one uppercase letter, one lowercase letter and one number"}), 400
+    password_regex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$"
+    if not re.match(password_regex, password):
+        return jsonify({"message": "Password should be minimum eight characters, at least one uppercase letter, one lowercase letter and one number"}), 400
 
-        existing_username = (User.query.filter_by(username=username).first() or admin.query.filter_by(admin_name=username).first() or manager.query.filter_by(manager_name=username).first())
+    # existing_username = (User.query.filter_by(username=username).first() or admin.query.filter_by(admin_name=username).first() or manager.query.filter_by(manager_name=username).first())
 
-        if existing_username:
-            return jsonify({"message": "Already exists"}), 400
+    # if existing_username:
+    #     return jsonify({"message": "Already exists"}), 400
 
-        hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
-        if role== 'admin':
-            new_user= admin(admin_name= username, password= hashed_password)
+    hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+    if role== 'admin':
+        new_user= admin(admin_name= username, password= hashed_password)
 
-        if role== 'user':
-            new_user = User(username=username, password=hashed_password)
-        
-        if role== 'manager':
-            new_user = manager(manager_name=username, password=hashed_password)
-
-        db.session.add(new_user)
-        db.session.commit()
-
-        return jsonify({"message": "register successful"}), 201
+    if role== 'user':
+        new_user = User(username=username, password=hashed_password)
     
-    else:
-        return jsonify({'msg': 'You do not have permission to access this route'}), 403
+    if role== 'manager':
+        new_user = manager(manager_name=username, password=hashed_password)
 
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({"message": "register successful"}), 201
+
+# @app.route('/register', methods=['POST'])
+# @jwt_required()
+# def register():
+#     current_user_id = get_jwt_identity()
+#     adminx = admin.query.filter_by(id=current_user_id).first()
+#     if adminx:
+#         username = request.json.get('username', None)
+#         password = request.json.get('password', None)
+#         role= request.json.get('role', None)
+
+#         if len(username) > 10:
+#             return jsonify({"message": "username too long"}), 400
+
+#         password_regex = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$"
+#         if not re.match(password_regex, password):
+#             return jsonify({"message": "Password should be minimum eight characters, at least one uppercase letter, one lowercase letter and one number"}), 400
+
+#         existing_username = (User.query.filter_by(username=username).first() or admin.query.filter_by(admin_name=username).first() or manager.query.filter_by(manager_name=username).first())
+
+#         if existing_username:
+#             return jsonify({"message": "Already exists"}), 400
+
+#         hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+#         if role== 'admin':
+#             new_user= admin(admin_name= username, password= hashed_password)
+
+#         if role== 'user':
+#             new_user = User(username=username, password=hashed_password)
+        
+#         if role== 'manager':
+#             new_user = manager(manager_name=username, password=hashed_password)
+
+#         db.session.add(new_user)
+#         db.session.commit()
+
+#         return jsonify({"message": "register successful"}), 201
+    
+#     else:
+#         return jsonify({'msg': 'You do not have permission to access this route'}), 403
+
+@app.route('/view', methods=['GET'])
+def view():
+    role= request.json.get('role')
+    id = request.json.get('id')
+    person= []
+    if role == 'manager':
+        users = User.query.filter_by(manager_id=id).all()
+        for user in users:
+            person.append({'id': user.id, 'username': user.username, 'password': user.password})
+    
+        return jsonify(person)
+    
+    # if role == 'employee':
+    #     record = db.session.query(User).join(manager, User.manager_id == manager.id)
+    #     return jsonify({"employee_username": record.username, "manager_id": record.manager_id, "manager_name": record.manager_name})
+    if role == 'employee':
+        record = db.session.query(User.username, User.manager_id, admin.admin_name.label('manager_name')) \
+                .join(admin, User.manager_id == admin.id) \
+                .filter(User.id == id).first()
+        if record:
+            result = {"employee_username": record.username, "manager_id": record.manager_id, "manager_name": record.manager_name}
+            return jsonify(result)
+        else:
+            return jsonify({"message": "User not found"})
 
 
 @app.route('/admin-only/<int:user_id>', methods=['PATCH', 'DELETE'])
