@@ -45,6 +45,11 @@ with app.app_context():
     # db.init_app(app)
     db.create_all()
 
+def search_by_fn(people):
+    person= []
+    for x in people:
+        person.append({'id': x[0], 'username': x[1], 'password': x[2]})
+    return person
 
 @app.route('/')
 def home():
@@ -92,18 +97,30 @@ def search():
     # user_id= request.json.get('userid', None)
     # user = User.query.get(user_id)
     if(search_by== 'name'):
-        person= []
+        a= []
+        # person = []
         users = User.query.filter_by(username=name).all()
-        for user in users:
-            person.append({'id': user.id, 'username': user.username, 'password': user.password})
+        # x= search_by_fn(users) cannot give like this because in the function i have accessed using index but there it is a tuple so that is why bottom code is correct where we convert to list
+        x = search_by_fn([(u.id, u.username, u.password) for u in users])
+        a.append(x)
+        # for user in users:
+        #     person.append({'id': user.id, 'username': user.username, 'password': user.password})
         admins = admin.query.filter_by(admin_name=name).all()
-        for Admin in admins:
-            person.append({'id': Admin.id, 'admin_name': Admin.admin_name, 'password': Admin.password})
+        # y= search_by_fn(admins)
+        y = search_by_fn([(a.id, a.admin_name, a.password) for a in admins])
+        a.append(y)
+        # for Admin in admins:
+        #     person.append({'id': Admin.id, 'admin_name': Admin.admin_name, 'password': Admin.password})
         managers = manager.query.filter_by(manager_name=name).all()
-        for Manager in managers:
-            person.append({'id': Manager.id, 'manager_name': Manager.manager_name, 'password': Manager.password})
+        # z= search_by_fn(managers)
+        z = search_by_fn([(m.id, m.manager_name, m.password) for m in managers])
+        a.append(z)
+        # for Manager in managers:
+        #     person.append({'id': Manager.id, 'manager_name': Manager.manager_name, 'password': Manager.password})
 
-        return jsonify(person)
+        # return jsonify(person)
+        return jsonify(a)
+
     
     elif search_by == 'role':
         persons = []
