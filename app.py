@@ -48,8 +48,8 @@ with app.app_context():
 def home():
     return jsonify({'message': 'Hello, World!'})
 
-@app.route('/login', methods=['POST'])
-def login():
+@app.route('/login', methods=['POST']) #login module 
+def login(): 
     username = request.json.get('username', None)
     password = request.json.get('password', None)
 
@@ -65,7 +65,7 @@ def login():
     return jsonify(access_token=access_token), 200
     return jsonify({"message":"Login successful"})
 
-@app.route('/display_manager', methods = ['GET'])
+@app.route('/display_manager', methods = ['GET']) #when we give id of an employee, then the employee details + what manager he is reporting to will be displayed. to display the manager name, I have used self join.
 def display_manager():
     id = request.json.get('id', None)
     user = User.query.filter_by(id=id).first()
@@ -97,7 +97,7 @@ def display_manager():
 
 
 
-@app.route('/search', methods=['GET'])
+@app.route('/search', methods=['GET']) # To search users based on name or role
 def search():
     search_by= request.json.get('search_by')
     name= request.json.get('name', None)
@@ -133,17 +133,7 @@ def search():
 
     return jsonify({'message': 'Invalid search_by parameter'}), 400
 
-
-    #     return jsonify({"id": person[0], "name": person[1], "password": person[2]})
-    # print(user)
-
-
-    # elif search_by == 'role':
-
-
-    # return jsonify({"username": user.username, "password": user.password})
-
-@app.route('/register', methods=['POST'])
+@app.route('/register', methods=['POST']) #Registration module can be accessed only by admin.
 @jwt_required()
 def register():
     current_user_id = get_jwt_identity()
@@ -179,7 +169,7 @@ def register():
     else:
         return jsonify({'msg': 'You do not have permission to access this route'}), 403
 
-@app.route('/view', methods=['GET'])
+@app.route('/view', methods=['GET']) # View method to view any user from the company
 def view():
     id = request.json.get('id')
     user = User.query.filter_by(id=id).first()
@@ -189,7 +179,7 @@ def view():
     else:
         return jsonify({"message": "User not found"})
 
-@app.route('/display', methods=['GET'])
+@app.route('/display', methods=['GET']) #To display the reporting manager details if it is employee or display the reportees if it is manager.
 def display():
     persons = []
     id = request.json.get('id')
@@ -210,7 +200,7 @@ def display():
         return jsonify({"message": "User not found"})
 
 
-@app.route('/admin-only/<int:user_id>', methods=['PATCH', 'DELETE'])
+@app.route('/admin-only/<int:user_id>', methods=['PATCH', 'DELETE']) #Only admin will be able to update or delete any user.
 @jwt_required()
 def admin_only(user_id):
     current_user_id = get_jwt_identity()
@@ -243,7 +233,7 @@ def admin_only(user_id):
     else:
         return jsonify({'msg': 'You do not have permission to access this route'}), 403
 
-@app.route('/adminaccess-only', methods=['PATCH'])
+@app.route('/adminaccess-only', methods=['PATCH']) #Only admin will be able to assign a employee to a manager.
 @jwt_required()
 def adminaccess_only():
     current_user_id = get_jwt_identity()
@@ -270,7 +260,7 @@ def adminaccess_only():
     else:
         return jsonify({'msg': 'You do not have permission to access this route'}), 403
 
-@app.route('/admin_change_role', methods=['PATCH'])
+@app.route('/admin_change_role', methods=['PATCH']) #Only admin has rights to change the role of an employee to manager
 @jwt_required()
 def admin_change_role():
     current_user_id = get_jwt_identity()
