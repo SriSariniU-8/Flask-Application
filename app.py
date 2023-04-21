@@ -8,6 +8,7 @@ import psycopg2
 import re
 from flask_bcrypt import Bcrypt
 from datetime import timedelta
+from sqlalchemy.orm import aliased
 
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity
@@ -16,8 +17,7 @@ from flask_bcrypt import Bcrypt
 from sqlalchemy.orm import sessionmaker
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:Sr080601@localhost/Company'
-
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:Sr080601@localhost/Database'
 app.config['SECRET_KEY'] = 'thisisasecretkey'
 app.config['JWT_SECRET_KEY'] = 'super-secret'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = 3600
@@ -34,10 +34,6 @@ class User(db.Model):
     manager_id = db.Column(db.Integer)
     role_id = db.Column(db.Integer, db.ForeignKey('role.role_id'))
 
-class Manager(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    manager_name = db.Column(db.String(20), nullable=False, unique=True)
-
 class Role(db.Model):
     role_id = db.Column(db.Integer, primary_key=True)
     role_name = db.Column(db.String(20), nullable=False, unique=True)
@@ -45,6 +41,8 @@ class Role(db.Model):
 with app.app_context():
     # db.init_app(app)
     db.create_all()
+    Session = sessionmaker(bind=db.engine)
+
 
 @app.route('/')
 def home():
@@ -66,6 +64,38 @@ def login():
     access_token = create_access_token(identity=user.id,expires_delta=timedelta(hours=1))
     return jsonify(access_token=access_token), 200
     return jsonify({"message":"Login successful"})
+
+@app.route('/display_manager', methods = ['GET'])
+def display_manager():
+    id = request.json.get('id', None)
+    user = User.query.filter_by(id=id).first()
+    if user:
+        session = Session()
+        employee = aliased(User)
+        manager = aliased(User)
+        result = session.query(
+        employee.id,
+        employee.username,
+        employee.manager_id,
+        manager.username.label('ManagerName')
+    ).join(
+        manager,
+        employee.manager_id == manager.id
+    ).filter(
+        employee.id == id
+    ).all()
+        session.close()
+        data = []
+        for row in result:
+            d = {'id': row[0], 'username': row[1], 'manager_id': row[2], 'manager_name': row[3]}
+            data.append(d)
+        
+        return jsonify(data)
+
+    else:
+        return jsonify({"message": "enter valid userid"})
+
+
 
 @app.route('/search', methods=['GET'])
 def search():
@@ -161,27 +191,23 @@ def view():
 
 @app.route('/display', methods=['GET'])
 def display():
-    person = []
+    persons = []
     id = request.json.get('id')
-    user = User.query.filter_by(id=id).first()
-    if (user.role_id == 1):
-        manager = Manager.query.filter_by(manager_name= user.username).first()
-        users = User.query.filter_by(manager_id=manager.id).all()
+    person = User.query.filter_by(id=id).first()
+    if (person.role_id == 1):
+        # manager = Manager.query.filter_by(manager_name= user.username).first()
+        users = User.query.filter_by(manager_id=person.id).all()
         for user in users:
-            if (user.manager_id == manager.id):
-                person.append({"manager_name": manager.manager_name,"id":user.id, "username": user.username, "email": user.email})
+            if (user.manager_id == person.id):
+                persons.append({"manager_name": person.username,"id":user.id, "username": user.username, "email": user.email})
                 
-        return jsonify(person)
+        return jsonify(persons)
 
-    if user.role_id == 0:
-        record = db.session.query(User.username, User.manager_id, Manager.manager_name.label('manager_name')) \
-                .join(Manager, User.manager_id == Manager.id) \
-                .filter(User.id == id).first()
-        if record:
-            result = {"employee_username": record.username, "manager_id": record.manager_id, "manager_name": record.manager_name}
-            return jsonify(result)
-        else:
-            return jsonify({"message": "User not found"})
+    if person.role_id == 0:
+        result = {"employee_username": person.username,"email": person.email, "manager_id": person.manager_id}
+        return jsonify(result)
+    else:
+        return jsonify({"message": "User not found"})
 
 
 @app.route('/admin-only/<int:user_id>', methods=['PATCH', 'DELETE'])
@@ -227,13 +253,14 @@ def adminaccess_only():
         manager_id= request.json.get("mentor_id", None)
     
         user = User.query.filter_by(id=user_id).first()
-        manager= Manager.query.filter_by(id=manager_id).first()
+        manager= User.query.filter_by(id=manager_id).first()
 
+        
         if (not user or not manager):
             return jsonify({"message": "User or manager not found"}), 404
     
-        if manager:
-            user.manager_id= manager_id
+        if manager.role_id== 1 :
+            user.manager_id= manager.id
             db.session.commit()
             return jsonify({"message": "Manager assigned to User successfully"}), 200
         
@@ -257,10 +284,6 @@ def admin_change_role():
             if user is not None:
                 if role_change== 'Manager':
                     user.role_id = 1
-                    db.session.commit()
-                    user_copy = User(username=user.username, password=user.password)
-                    manager = Manager(manager_name= user_copy.username)
-                    db.session.add(manager)
                     db.session.commit()
                     return jsonify({"message": "role changed to Manager"})
                 
